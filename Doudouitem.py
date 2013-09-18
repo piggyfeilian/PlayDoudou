@@ -1,5 +1,5 @@
 # -*- coding: UTF-8 -*-
-#豆豆item
+#豆豆item,教猪打豆豆
 
 from PyQt4.QtGui import *
 form PyQt4.QtCore import *
