@@ -25,18 +25,40 @@ class DouBack(QGraphicsObject):
     def boundingRect(self):
         return QRect(0 ,0, UNIT_WIDTH + EDGE_WIDTH, UNIT_WIDTH + EDGE_WIDTH)
 
+class DouMap(DouBack):
+    def __init__(self, x, y, flag, parent = None):
+        super(DouMap, self).__init__(x, y, parent)
+        self.flag = flag
+
+    def paint(self, painter, option, widget = None):
+        painter.save()
+        painter.setWidth(EDGE_WIDTH)
+
+        brush = QBrush(Qt.Dense6Pattern)
+        brush.setColor(color = QColor(192, 192, 192) if flag else QColor(255, 255, 255))
+        painter.setBrush(brush)
+        painter.drawRect(QRect(0, 0, UNIT_WIDTH+EDGE_WIDTH, UNIT_WIDTH+EDGE_WIDTH))
+
+        painter.restore()
+
 class DouDou(DouBack):
     def __init__(self, x, y, color, parent = None):
         super(Doudou, self).__init__(x, y, parent)
-        self.color = QColor(*color)
+        if isinstance(color, tuple):
+            self.color = QColor(*color)
+        else:
+            self.color = None
 
     def paint(self, painter, option, widget = None):
         #暂时用圆代替
         painter.save()
-        brush = QBrush(Qt.SolidPattern)
-        brush.setColor(self.color)
-        painter.setBrush(brush)
-        painter.drawEllipse(EDGE_WIDTH/2, EDGE_WIDTH / 2, UNIT_WIDTH, UNIT_WIDTH)
+        if self.color:
+            brush = QBrush(Qt.SolidPattern)
+            brush.setColor(self.color)
+            painter.setBrush(brush)
+            painter.drawEllipse(EDGE_WIDTH/2, EDGE_WIDTH / 2, UNIT_WIDTH, UNIT_WIDTH)
+        else:
+            painter.drawImage(QPointF(EDGE_WIDTH/2, EDGE_WIDTH/2),QImage(":piggy.png").scaled(UNIT_WIDTH, UNIT_WIDTH))
         painter.restore()
 
     def __eq__(self, obj):
