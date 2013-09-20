@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
-
+#千万注意各个地方的数组坐标和view坐标的转化
 from Doudouitem import *
-import random,sys
+import random, sys, copy
 
 NODOU = 0
 RED = 1
@@ -19,7 +19,9 @@ BLACK = 10
 PIGGY = 11
 #障碍
 BALK = 12
-
+#允许剩下的个数
+LEFT_NUM = 8
+#颜色rgb
 Colors = (None, (255,0,0), (255,192,203),(255,255,0), (255,97,0),(0,0,255),
           (176, 224, 230), (124, 252, 0), (34, 139, 34), (160, 32, 240), (0, 0, 0), PIGGY, BALK)
 
@@ -35,6 +37,7 @@ class DouDouView(QGraphicsView):
         #默认size
         self.douMapSize = (12, 12)
         self.range = 0
+        self.num_balk = 0
         self.doudous = []
 #        self.dous = []
         self.score = 0
@@ -42,8 +45,10 @@ class DouDouView(QGraphicsView):
         self.douMap_list = []
         self.animation = None
         self.tmpItem = []
+        self.toDisappear = []
         #空白点列表
         self.availableSpots = []
+        self.connect(self, SIGNAL("missionComp()"), self.on_missionComp)
     #设置打豆豆大小
     def setDouSize(self, size):
         for i in range(size[0]):
@@ -74,6 +79,7 @@ class DouDouView(QGraphicsView):
             if num_balk > num_blank:
                 num_balk = num_blank
         print "piggy个数：", num_piggy#for test
+        self.num_balk = num_balk
 
         rand_start = 0 if num_blank else -1
         rand_end = 10 if num_piggy else 11
@@ -124,13 +130,13 @@ class DouDouView(QGraphicsView):
                 self.doudous[a][b] = Balk(b, a)
                 self.scene.addItem(self.doudous[a][b])
                 self.doudous[a][b].setPos(b, a)
-        num = 0
-        for i in self.availableSpots:
-            if self.checkCorrect((i[1], i[0])):
-                num += 1
+#        num = 0
+#        for i in self.availableSpots:
+#            if self.checkCorrect((i[1], i[0])):
+#                num += 1
         #如果一开始太少可以点的地方就处理一下
-        if num <= 3:
-            pass
+#        if num <= 3:
+#            pass
             
     #用于继续上次的游戏,文件io在外部实现
     def setDoudou(self, douList, range_, score):
@@ -154,162 +160,13 @@ class DouDouView(QGraphicsView):
                     new_dou.setPos(j, i)
                 self.doudous[i].append(new_dou)
 
-    #检查是否该位置可以消除
-    def checkCorrect(self, cord):
-        i, j = cord
-        while True:
-            i += 1
-            if i >= self.douMapSize[0]:
-                break
-            if isinstance(self.doudous[i][cord[1]], DouDou):
-                while True:
-                    j += 1
-                    if j >= self.douMapSize[1]:
-                        break
-                    if not self.doudous[cord[0]][j]:
-                        continue
-                    elif isinstance(self.doudous[cord[0]][j], DouDou):
-                         if self.doudous[i][cord[1]] == self.doudous[cord[0]][j]:
-                             return True, ((i, cord[1]), (cord[0], j))
-                         else:
-                             break
-                    else:
-                        break
-                while True:
-                    j -= 1
-                    if j < 0:
-                        break
-                    if not self.doudous[cord[0]][j]:
-                        continue
-                    elif isinstance(self.doudous[cord[0]][j], DouDou):
-                         if self.doudous[i][cord[1]] == self.doudous[cord[0]][j]:
-                             return True, ((i, cord[1]), (cord[0], j))
-                         else:
-                             break
-                    else:
-                        break
-        while True:
-            i -= 1
-            if i < 0:
-                break
-            if isinstance(self.doudous[i][cord[1]], DouDou):
-                while True:
-                    j += 1
-                    if j >= self.douMapSize[1]:
-                        break
-                    if not self.doudous[cord[0]][j]:
-                        continue
-                    elif isinstance(self.doudous[cord[0]][j], DouDou):
-                         if self.doudous[i][cord[1]] == self.doudous[cord[0]][j]:
-                             return True, ((i, cord[1]), (cord[0], j))
-                         else:
-                             break
-                    else:
-                        break
-                while True:
-                    j -= 1
-                    if j < 0:
-                        break
-                    if not self.doudous[cord[0]][j]:
-                        continue
-                    elif isinstance(self.doudous[cord[0]][j], DouDou):
-                         if self.doudous[i][cord[1]] == self.doudous[cord[0]][j]:
-                             return True, ((i, cord[1]), (cord[0], j))
-                         else:
-                             break
-                    else:
-                        break
-        return False, ()
-
-    #mousepresseventhandler
-    def mousePressEvent(self, event):
-        print "moused"
-        if not self.gameStarted:
-            event.ignore()
-            return
-        self.TerminateAni()
-        if event.button() != Qt.LeftButton:
-            event.ignore()
-            return
-        print "yes, mouse press"
-        items = self.items(event.pos())
-        if not items:
-            return
-        item = items[0]
-        if not (item.corX, item.corY) in self.availableSpots:
-            #加入一个点击豆豆的框框
-            return
-        tmp = self.checkCorrect((item.corY, item.corX))
-        print "check correct answer:", tmp[0], tmp[1]#for test
-        if tmp[0]:
-#            self.animation = 
-            #用状态机来做动画还是在这里直接add动画？试试直接的吧，虽然觉得不太好
-            self.toDisappear = tmp[1]
-            self.animation, tmpItem = self.correctAnimation(tmp[1])
-            self.tmpItem.extend(tmpItem)
-            self.connect(self.animation, SIGNAL("finished()"), self.TerminateAni)
-            self.animation.start()
-
-    def itemsOfAnimation(self, two_dou):
-        items = []
-        start = min(two_dou[1][0],two_dou[0][0])
-        end = max(two_dou[1][0], two_dou[0][0])
-        for i in range(start + 1, end):
-            new_ind = IndItem(two_dou[0][1], i)
-            self.scene.addItem(new_ind)
-            new_ind.setPos(new_ind.corX, new_ind.corY)
-            new_ind.setOpacity(0)
-            items.append(new_ind)
-        start = min(two_dou[0][1],two_dou[1][1])
-        end = max(two_dou[0][1], two_dou[1][1])
-        for i in range(start + 1, end):
-            new_ind = IndItem(j, two_dou[1][0])
-            self.scene.addItem(new_ind)
-            new_ind.setPos(new_ind.corX, new_ind.corY)
-            new_ind.setOpacity(0)
-            items.append(new_ind)
-        new_ind = IndItem(two_dou[0][1], two_dou[1][0])
-        self.scene.addItem(new_ind)
-        new_ind.setPos(new_ind.corX, new_ind.corY)
-        new_ind.setOpacity(0)
-        items.append(new_ind)
-
-        return items
-
-    def correctAnimation(self, two_dou):
-        ani_group = QParallelAnimationGroup()
-        tmp = self.itemsOfAnimation(two_dou)
-        for item in tmp:
-            anim = QPropertyAnimation(item, "opacity")
-            anim.setDuration(500)
-            anim.setStartValue(0)
-            anim.setKeyValueAt(0.1, 1)
-            anim.setKeyValueAt(0.8, 1)
-            anim.setEndValue(0)
-            ani_group.addAnimation(anim)
-        #这里要做一个猪猪被消除就睁开眼睛的动画，在item里加入parent-child关系
-   #     anim = Q
-        return ani_group, tmp
-
-    def TerminateAni(self):
-        sender = self.sender()
-        if not self.animation:
-            return
-        if not isinstance(sender, QAbstractAnimation):
-            self.animation.stop()
-        self.animation.deleteLater()
-        self.animation = None
-        for item in self.tmpItem:
-            self.scene.removeItem(item)
-        self.tmpItem = []
-        for tup in self.toDisappear:
-            item = self.doudous[tup[0]][tup[1]]
-            self.doudous[tup[0]][tup[1]] = None
-            self.availableSpots.append((tup[1], tup[0]))
-            self.scene.removeItem(item)
-        self.toDisappear = []
-
-    def mouseMoveEvent(self, event):
+    def checkWin(self):
+        if self.douMapSize[0] * self.douMapSize[1] - len(self.availableSpots)\
+                - self.num_balk <= LEFT_NUM:
+            return True
+        return False
+    def on_missionComp(self):
+        #还是在主界面弹出对话框好了，下一关或者回到主界面
         pass
     #重新排列现有豆豆函数
     def refreshDou(self):
@@ -329,6 +186,187 @@ class DouDouView(QGraphicsView):
         for item in self.douMap_list:
             self.scene.remove(item)
         self.douMap_list = []
+                
+    #mousepresseventhandler
+    def mousePressEvent(self, event):
+        print "moused"
+        if not self.gameStarted:
+            event.ignore()
+            return
+        self.TerminateAni()
+        if event.button() != Qt.LeftButton:
+            event.ignore()
+            return
+        print "yes, mouse press"
+        items = self.items(event.pos())
+        if not items:
+            return
+        item = items[0]
+        if not (item.corX, item.corY) in self.availableSpots:
+            return
+        tmp = self.checkCorrect((item.corY, item.corX))
+        print tmp
+        if tmp:
+#            self.animation = 
+            #用状态机来做动画还是在这里直接add动画？试试直接的吧，虽然觉得不太好
+            for couple in tmp:
+                for thing in couple:
+                    self.toDisappear.append(thing)
+            self.animation, tmpItem = self.correctAnimation((item.corY, item.corX), tmp)
+            self.tmpItem.extend(tmpItem)
+            self.connect(self.animation, SIGNAL("finished()"), self.TerminateAni)
+            self.animation.start()
+
+    #检查是否该位置可以消除
+    def checkCorrect(self, cord):
+        i, j = cord
+        compareItems = []
+        while True:
+            i += 1
+            if i >= self.douMapSize[0]:
+                break
+            if isinstance(self.doudous[i][cord[1]], DouDou):
+                compareItems.append(((i, cord[1]), self.doudous[i][cord[1]]))
+                break
+            elif not self.doudous[i][cord[1]]:
+                continue
+            else:
+                break
+        while True:
+            j += 1
+            if j >= self.douMapSize[1]:
+                break
+            if isinstance(self.doudous[cord[0]][j], DouDou):
+                compareItems.append(((cord[0], j), self.doudous[cord[0]][j]))
+                break
+            elif not self.doudous[cord[0]][j]:
+                continue
+            else:
+                break
+        i, j = cord
+        while True:
+            j -= 1
+            if j < 0:
+                break
+            if isinstance(self.doudous[cord[0]][j], DouDou):
+                compareItems.append(((cord[0], j),self.doudous[cord[0]][j]))
+                break
+            elif not self.doudous[cord[0]][j]:
+                continue
+            else:
+                break
+        while True:
+            i -= 1
+            if i < 0:
+                break
+            if isinstance(self.doudous[i][cord[1]], DouDou):
+                compareItems.append(((i, cord[1]), self.doudous[i][cord[1]]))
+                break
+            elif not self.doudous[i][cord[1]]:
+                continue
+            else:
+                break
+        print "compareItems:",compareItems
+        sameItems = {}
+        for item in compareItems:
+            if not sameItems:
+                sameItems[item[1]] = [item[0]]
+                continue
+            #不能直接用item in dict(应该是用id比的而不是__eq__)
+            for la in sameItems:
+                if item[1] == la:
+                    print "same"
+                    sameItems[la].append(item[0])
+                    break
+            else:
+                sameItems[item[1]] = [item[0]]
+        itemToReturn = []
+        print "same items:",sameItems
+        for i in sameItems.values():
+            if len(i) > 1:
+                itemToReturn.append(i)
+        return itemToReturn
+
+
+
+    def itemsOfAnimation(self, pressPos, douGroup):
+        #每对消除随机获得一个颜色（还没实现）
+        items = []
+        douGroup = list(douGroup)
+        douGroup.append(pressPos)
+
+        print "douGroup:", douGroup
+        start = min([x[0] for x in douGroup])
+        end = max([x[0] for x in douGroup])
+        print "start:", start
+        print "end:", end
+        for i in range(start + 1, end):
+            new_ind = IndItem(pressPos[1], i)
+            self.scene.addItem(new_ind)
+            new_ind.setPos(new_ind.corX, new_ind.corY)
+            new_ind.setOpacity(0)
+            items.append(new_ind)
+        start = min([x[1] for x in douGroup])
+        end = max([x[1] for x in douGroup])
+        for i in range(start + 1, end):
+            new_ind = IndItem(i, pressPos[0])
+            self.scene.addItem(new_ind)
+            new_ind.setPos(new_ind.corX, new_ind.corY)
+            new_ind.setOpacity(0)
+            items.append(new_ind)
+        tmp_flag = False
+        for item in items:
+            if (item.corY, item.corX) == pressPos:
+                tmp_flag = True
+                break
+        if not tmp_flag:
+            new_ind = IndItem(pressPos[1], pressPos[0])
+            self.scene.addItem(new_ind)
+            new_ind.setPos(new_ind.corX, new_ind.corY)
+            new_ind.setOpacity(0)
+            items.append(new_ind)
+
+        return items
+
+    def correctAnimation(self, pressPos, douGroups):
+        ani_group = QParallelAnimationGroup()
+        for group in douGroups:
+            print "group:", group#for test
+            items = self.itemsOfAnimation(pressPos, group)
+            for item in items:
+                anim = QPropertyAnimation(item, "opacity")
+                anim.setDuration(500)
+                anim.setStartValue(0)
+                anim.setKeyValueAt(0.1, 1)
+                anim.setKeyValueAt(0.8, 1)
+                anim.setEndValue(0)
+                ani_group.addAnimation(anim)
+        #这里要做一个猪猪被消除就睁开眼睛的动画，在item里加入parent-child关系
+   #     anim = Q
+        return ani_group, items
+
+    def TerminateAni(self):
+        sender = self.sender()
+        if not self.animation:
+            return
+        if not isinstance(sender, QAbstractAnimation):
+            self.animation.stop()
+        self.animation.deleteLater()
+        self.animation = None
+        for item in self.tmpItem:
+            self.scene.removeItem(item)
+        self.tmpItem = []
+        for tup in self.toDisappear:
+            item = self.doudous[tup[0]][tup[1]]
+            self.doudous[tup[0]][tup[1]] = None
+            self.availableSpots.append((tup[1], tup[0]))
+            self.scene.removeItem(item)
+        self.toDisappear = []
+        if self.checkWin():
+            self.emit(SIGNAL("missionComp()"))
+
+    def mouseMoveEvent(self, event):
+        pass
 
 
 # for test

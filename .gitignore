@@ -3,3 +3,9 @@
 #emacs
 [#]*[#]
 *~
+#image
+image/
+
+#not nessasary
+*.ui
+qrc_resource.py
